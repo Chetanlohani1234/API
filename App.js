@@ -3,7 +3,8 @@ const https = require('https');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const app = express();
-const port = 3001;
+const axios = require('axios');
+const port = 5000;
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -126,6 +127,49 @@ app.post('/get-token', (req, res) => {
         res.json({response});
     });
 });
+
+app.post('/generate', async (req, res) => {
+    const { model, prompt, stream } = req.body;
+
+    console.log('Received Data:', { model, prompt, stream });
+
+    try {
+        const apiResponse = await axios({
+            method: 'post',
+            url: 'http://103.61.103.107:11434/api/generate',
+            data: { model, prompt, stream },
+            responseType: 'stream'
+        });
+
+        apiResponse.data.on('data', (chunk) => {
+            try {
+                // Convert the chunk to a string and parse it as JSON
+                const parsedChunk = JSON.parse(chunk.toString());
+
+                // Reformat the JSON object with indentation
+                const formattedJson = JSON.stringify(parsedChunk, null, 4);
+
+                // Log the formatted JSON for debugging
+                console.log('Formatted JSON:', formattedJson);
+
+                // Send the formatted JSON chunk to the client
+                res.write(formattedJson + '\n');
+            } catch (error) {
+                console.error('Error parsing or formatting chunk:', error.message);
+            }
+        });
+
+        apiResponse.data.on('end', () => {
+            console.log('Streaming complete.');
+            res.end(); // Close the connection when the stream ends
+        });
+
+    } catch (error) {
+        console.error('Error calling external API:', error.message);
+        res.status(500).json({ message: 'Error calling external API', error: error.message });
+    }
+});
+
 
 
 
